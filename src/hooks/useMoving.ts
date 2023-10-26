@@ -41,7 +41,6 @@ export const useMoving = ({
   return useCallback((e) => {
     if (e.button) return;
     e.preventDefault();
-    e.stopPropagation();
     refState.current.down = true;
     refState.current.x = e.clientX;
     refState.current.y = e.clientY;
