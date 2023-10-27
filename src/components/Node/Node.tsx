@@ -1,7 +1,7 @@
 import { useMoving } from "hooks/useMoving";
 import { useProxyState } from "hooks/useProxyState";
 import { ReactiveSet } from "library/ReactiveSet";
-import { createContext, FC, ReactNode, useContext, useEffect, useLayoutEffect, useRef } from "react";
+import { createContext, FC, ReactNode, useContext, useEffect, useId, useLayoutEffect, useRef } from "react";
 
 import { Connector, TConnector } from ".";
 import styles from "./Node.module.sass";
@@ -11,10 +11,14 @@ export type TNodeProps = {
   y?: number;
   title?: string;
   children?: ReactNode;
+
+  onSelect?(): any;
+  onDragStart?(x: number, y: number): any;
+  onDragMoving?(x: number, y: number): any;
+  onDragEnd?(x: number, y: number): any;
 };
 
 const NodeContext = createContext<ReactiveSet<TConnector> | null>(null);
-
 
 export const registerConnector = (conn: TConnector) => {
   const list = useContext(NodeContext);
@@ -32,12 +36,13 @@ export const Node: FC<TNodeProps> = ({
   x = 0,
   y = 0,
   title = 'Unnamed node',
-  children
+  children,
+  ...events
 }) => {
+  const id = useId();
   const ref = useRef<HTMLDivElement>(null);
   const pos = useProxyState({ x, y });
   const size = useProxyState({ width: 0, height: 0 });
-  const moveState = useRef({ x: 0, y: 0 });
   const padding = 10;
   const connectors = ReactiveSet.use<TConnector>();
 
@@ -60,13 +65,19 @@ export const Node: FC<TNodeProps> = ({
 
   const moving = useMoving({
     start() {
-      moveState.current.x = pos.x;
-      moveState.current.y = pos.y;
+      events.onDragStart?.(pos.x, pos.y);
+      return {
+        x: pos.x,
+        y: pos.y
+      };
     },
-    moving(dx, dy) {
-      const { x, y } = moveState.current;
+    moving({ dx, dy }, { x, y }) {
       pos.x = x + dx;
       pos.y = y + dy;
+      events.onDragMoving?.(pos.x, pos.y);
+    },
+    end() {
+      events.onDragEnd?.(pos.x, pos.y);
     }
   });
 
@@ -79,7 +90,7 @@ export const Node: FC<TNodeProps> = ({
       y={pos.y - size.height / 2}
       width={size.width}
       height={size.height}
-      onMouseDown={e => e.stopPropagation()}
+      onMouseDown={e => { e.stopPropagation(); events.onSelect?.(); }}
     >
       <div className={styles.fake} style={{ padding }}>
         <div ref={ref} className={styles.container}>
@@ -93,7 +104,7 @@ export const Node: FC<TNodeProps> = ({
             {!left.length ? null : (
               <div className={styles.left}>
                 {left.map((conn, i) => (
-                  <Connector conn={conn} key={i} />
+                  <Connector id={id} conn={conn} key={i} />
                 ))}
               </div>
             )}
@@ -105,7 +116,7 @@ export const Node: FC<TNodeProps> = ({
             {!right.length ? null : (
               <div className={styles.right}>
                 {right.map((conn, i) => (
-                  <Connector conn={conn} key={i} />
+                  <Connector id={id} conn={conn} key={i} />
                 ))}
               </div>
             )}

@@ -4,20 +4,20 @@ import { useLayoutEffect, useMemo } from "react";
 export class ReactiveSet<T> extends Set<T> {
   #subs = new Set<(v: this) => any>();
 
-  #update() {
+  update() {
     for (const sub of this.#subs)
       sub(this);
   }
 
   add(value: T): this {
     super.add(value);
-    this.#update();
+    this.update();
     return this;
   }
 
   delete(value: T): boolean {
     if (super.delete(value)) {
-      this.#update();
+      this.update();
       return true;
     }
     return false;
@@ -25,7 +25,7 @@ export class ReactiveSet<T> extends Set<T> {
 
   clear(): void {
     super.clear();
-    this.#update();
+    this.update();
     return;
   }
 

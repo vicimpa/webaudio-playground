@@ -47,7 +47,7 @@
   border-radius: 10px
   color: #fff
 
-  &::before, &::after
+  .point
     border-radius: 100%
     background-color: rgba(0,0,0,0.4)
     border: 2px solid rgba(0,0,0,0.5)
@@ -56,18 +56,20 @@
 
   &[data-type=in]
     padding-right: 10px
-    margin-left: -8px
+    margin-left: -6px
 
-    &::before
-      content: ''
+    .point
       display: block
       margin-left: -2px
 
   &[data-type=out]
+    flex-direction: row-reverse
     padding-left: 10px
-    margin-right: -8px
+    margin-right: -6px
 
-    &::after
-      content: ''
+    .point
       display: block
       margin-right: -2px
+
+.line
+  opacity: 0.5

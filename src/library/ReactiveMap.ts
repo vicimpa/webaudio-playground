@@ -4,20 +4,20 @@ import { useLayoutEffect, useMemo } from "react";
 export class ReactiveMap<K, V> extends Map<K, V> {
   #subs = new Set<(v: this) => any>();
 
-  #update() {
+  update() {
     for (const sub of this.#subs)
       sub(this);
   }
 
   set(key: K, value: V): this {
     super.set(key, value);
-    this.#update();
+    this.update();
     return this;
   }
 
   delete(key: K): boolean {
     if (super.delete(key)) {
-      this.#update();
+      this.update();
       return true;
     }
     return false;
@@ -25,7 +25,7 @@ export class ReactiveMap<K, V> extends Map<K, V> {
 
   clear(): void {
     super.clear();
-    this.#update();
+    this.update();
     return;
   }
 

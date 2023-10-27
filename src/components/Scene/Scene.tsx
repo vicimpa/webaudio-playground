@@ -1,100 +1,77 @@
+import { useEvent } from "hooks/useEvent";
 import { useMoving } from "hooks/useMoving";
-import { useProxyState } from "hooks/useProxyState";
-import { useRerender } from "hooks/useRerender";
 import { useWindowEvent } from "hooks/useWindowEvent";
-import { getSvgValue } from "library/getSvgValue";
 import { minMax } from "library/math";
-import { createContext, FC, ReactNode, useContext, useEffect, useRef, useState } from "react";
+import { ReactiveSet } from "library/ReactiveSet";
+import { FC, ReactNode, useEffect, useMemo, useRef } from "react";
 
+import { SceneProvider, TLayer } from ".";
 import styles from "./Scene.module.sass";
 
 export type TSceneProps = {
   children?: ReactNode;
 };
 
-const SceneContext = createContext({ x: 0, y: 0, s: 1 });
-const SceneProvider = SceneContext.Provider;
-
-export const useSceneParams = () => {
-  return useContext(SceneContext);
-};
-
 export const Scene: FC<TSceneProps> = ({ children }) => {
   const svg = useRef<SVGSVGElement>(null);
-  const params = useProxyState({ x: 0, y: 0, s: 1 });
-  const rerender = useRerender();
-  const [viewBox, setViewBox] = useState<string | undefined>();
-  const mouseState = useRef({ x: 0, y: 0 });
+  const resize = useEvent(() => {
+    const elem = svg?.current;
+    if (!elem) return;
+
+    const width = elem.clientWidth;
+    const height = elem.clientHeight;
+
+    const cWidth = width / 2;
+    const cHeight = height / 2;
+
+    elem.viewBox.baseVal.x = -cWidth / params.s + params.x;
+    elem.viewBox.baseVal.y = -cHeight / params.s + params.y;
+    elem.viewBox.baseVal.width = width / params.s;
+    elem.viewBox.baseVal.height = height / params.s;
+  });
+  const observer = useMemo(() => new ResizeObserver(resize), []);
+  const params = useRef({ x: 0, y: 0, s: 1 }).current;
+  const layers = ReactiveSet.use<TLayer>();
 
   useEffect(() => {
     const elem = svg?.current;
     if (!elem) return;
 
-    const width = elem.clientWidth;
-    const height = elem.clientHeight;
-
-    const cWidth = width / 2;
-    const cHeight = height / 2;
-
-    setViewBox([
-      -cWidth / params.s + params.x,
-      -cHeight / params.s + params.y,
-      width / params.s,
-      height / params.s,
-    ].join(' '));
-  }, [
-    params.x, params.y, params.s,
-    getSvgValue(svg.current?.width),
-    getSvgValue(svg.current?.height)
-  ]);
-
-  useWindowEvent('resize', () => {
-    rerender();
-  });
+    resize();
+    observer.observe(elem);
+    return () => observer.unobserve(elem);
+  }, []);
 
   const moving = useMoving({
-    scale: params.s,
+    params,
     start() {
-      mouseState.current.x = params.x;
-      mouseState.current.y = params.y;
+      return {
+        x: params.x,
+        y: params.y
+      };
     },
-    moving(dx, dy) {
-      const { x, y } = mouseState.current;
+    moving(e, { x, y }) {
+      const { dx, dy } = e;
       params.x = x - dx;
       params.y = y - dy;
+      resize();
     }
   });
 
-  const glob2map = (X: number, Y: number) => {
-    const elem = svg?.current;
-    if (!elem) return;
-    const { x, y, s } = params;
-
-    const width = elem.clientWidth;
-    const height = elem.clientHeight;
-
-    const cWidth = width / 2;
-    const cHeight = height / 2;
-
-    return [
-      X / s - cWidth / s + x,
-      Y / s - cHeight / s + y,
-    ] as [x: number, y: number];
-  };
-
-  glob2map;
-
   useWindowEvent('wheel', (e) => {
     params.s = minMax(params.s + -e.deltaY * 0.003, .2, 5);
+    resize();
   });
 
   const p10 = 16;
   const p100 = 128;
 
+  const pre = [...layers].filter(e => e.isPre);
+  const post = [...layers].filter(e => !e.isPre);
+
   return (
     <svg
       ref={svg}
-      viewBox={viewBox}
       onMouseDown={moving}
       className={styles.scene}
     >
@@ -111,9 +88,17 @@ export const Scene: FC<TSceneProps> = ({ children }) => {
 
       <rect x={-p100 * 50} y={-p100 * 50} width={p100 * 100} height={p100 * 100} fill="url(#p100)" />
 
-      <SceneProvider value={params}>
+      {pre.map((e, i) => (
+        <g key={i} ref={e.ref} />
+      ))}
+
+      <SceneProvider value={{ params, svg, layers }}>
         {children}
       </SceneProvider>
+
+      {post.map((e, i) => (
+        <g key={i} ref={e.ref} />
+      ))}
     </svg>
   );
 };
